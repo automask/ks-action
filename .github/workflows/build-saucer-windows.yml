@@ -1,0 +1,55 @@
+name: Package Saucer
+
+on:
+  workflow_dispatch:
+    inputs:
+      saucer_ref:
+        description: Saucer tag or branch to build
+        required: true
+        default: v8.0.5
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Build Saucer for Windows
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out workflow source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Clone Saucer
+        shell: pwsh
+        env:
+          SAUCER_REF: ${{ inputs.saucer_ref }}
+        run: |
+          New-Item -ItemType Directory -Path Deps -Force | Out-Null
+          git clone --depth 1 --branch "$env:SAUCER_REF" https://github.com/saucer/saucer.git Deps\saucer
+
+      - name: Build and package Saucer
+        shell: pwsh
+        run: |
+          python Tools\PackSaucer.py `
+            --source Deps\saucer `
+            --build-dir Deps\saucer\build `
+            --output dist\saucer-windows-x64.zip
+
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: saucer-windows-x64
+          path: dist/saucer-windows-x64.zip
+          if-no-files-found: error
