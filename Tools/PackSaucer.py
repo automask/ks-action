@@ -78,7 +78,7 @@ def configure_and_package(args: argparse.Namespace) -> int:
             "-G",
             args.generator,
             f"-DCMAKE_BUILD_TYPE={args.config}",
-            "-Dsaucer_examples=OFF",
+            "-Dsaucer_examples=ON",
             "-Dsaucer_tests=OFF",
         ]
     )
