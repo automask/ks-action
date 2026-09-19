@@ -31,8 +31,8 @@ def parse_args(repository_root: Path) -> argparse.Namespace:
     )
     parser.add_argument(
         "--branch",
-        default="main",
-        help="Branch of this repository to commit and push to (default: main).",
+        default="",
+        help="Branch of this repository to commit and push to (default: the checked-out branch).",
     )
     parser.add_argument(
         "--message",
@@ -47,9 +47,14 @@ def parse_args(repository_root: Path) -> argparse.Namespace:
     return parser.parse_args()
 
 
-def run_command(command: list[str], cwd: Path | None = None, check: bool = True) -> subprocess.CompletedProcess:
+def run_command(
+    command: list[str],
+    cwd: Path | None = None,
+    check: bool = True,
+    capture: bool = False,
+) -> subprocess.CompletedProcess:
     print("+", subprocess.list2cmdline(command), flush=True)
-    return subprocess.run(command, check=check, cwd=cwd)
+    return subprocess.run(command, check=check, cwd=cwd, capture_output=capture, text=capture)
 
 
 def remove_tree(directory: Path) -> None:
@@ -116,6 +121,15 @@ def parse_entries(config: dict, key: str, path: Path) -> list[tuple[Path, Path]]
 def resolve_inside(repository_root: Path, path: Path) -> Path:
     resolved = path if path.is_absolute() else repository_root / path
     return resolved.resolve()
+
+
+def current_branch(repository_root: Path) -> str:
+    """The branch checked out here; the default push target, so main and master both work."""
+    result = run_command(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=repository_root, capture=True)
+    branch = result.stdout.strip()
+    if not branch or branch == "HEAD":
+        raise ValueError(f"Repository is on a detached HEAD; pass --branch explicitly: {repository_root}")
+    return branch
 
 
 def prepare_work_dir(work_dir: Path) -> None:
@@ -213,7 +227,7 @@ def copy_file(source: Path, target: Path, repository_root: Path) -> None:
     print(f"Copied file {source} to {target}")
 
 
-def commit_assets(args: argparse.Namespace, repository_root: Path, targets: list[Path]) -> int:
+def commit_assets(args: argparse.Namespace, repository_root: Path, targets: list[Path], branch: str) -> int:
     relative_targets = [target.relative_to(repository_root).as_posix() for target in targets]
     run_command(["git", "add", "--", *relative_targets], cwd=repository_root)
 
@@ -241,8 +255,8 @@ def commit_assets(args: argparse.Namespace, repository_root: Path, targets: list
 
     # Always push, even without a new commit: a commit left behind by an earlier
     # run would otherwise never reach the remote.
-    run_command(["git", "push", "origin", f"HEAD:{args.branch}"], cwd=repository_root)
-    print(f"Pushed {', '.join(relative_targets)} to {args.branch}.")
+    run_command(["git", "push", "origin", f"HEAD:{branch}"], cwd=repository_root)
+    print(f"Pushed {', '.join(relative_targets)} to {branch}.")
     return 0
 
 
@@ -273,7 +287,8 @@ def copy_configured_assets(args: argparse.Namespace) -> int:
         copy_file(work_dir / source, resolved_target, repository_root)
         targets.append(resolved_target)
 
-    return commit_assets(args, repository_root, targets)
+    branch = args.branch or current_branch(repository_root)
+    return commit_assets(args, repository_root, targets, branch)
 
 
 def main() -> int:

@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       branch:
-        description: Branch of this repository to commit and push to
-        required: true
-        default: main
+        description: Branch of this repository to commit and push to (leave empty to use the checked-out branch)
+        required: false
+        default: ""
         type: string
 
 permissions:
@@ -31,6 +31,7 @@ jobs:
         env:
           BRANCH: ${{ inputs.branch }}
         run: |
-          python .github\tools\CopyAssets.py `
-            --branch "$env:BRANCH" `
-            --push
+          # An empty PowerShell argument disappears, so only pass --branch when the input is set.
+          $branchArgs = @()
+          if ("$env:BRANCH") { $branchArgs += @("--branch", "$env:BRANCH") }
+          python .github\tools\CopyAssets.py @branchArgs --push

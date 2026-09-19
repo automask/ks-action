@@ -26,8 +26,8 @@ def parse_args(repository_root: Path) -> argparse.Namespace:
     )
     parser.add_argument(
         "--branch",
-        default="main",
-        help="Branch of this repository to commit and push to (default: main).",
+        default="",
+        help="Branch of this repository to commit and push to (default: the checked-out branch).",
     )
     parser.add_argument(
         "--push",
@@ -50,6 +50,15 @@ def run_command(
 def resolve_inside(repository_root: Path, path: Path) -> Path:
     resolved = path if path.is_absolute() else repository_root / path
     return resolved.resolve()
+
+
+def current_branch(repository_root: Path) -> str:
+    """The branch checked out here; the default push target, so main and master both work."""
+    result = run_command(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=repository_root, capture=True)
+    branch = result.stdout.strip()
+    if not branch or branch == "HEAD":
+        raise ValueError(f"Repository is on a detached HEAD; pass --branch explicitly: {repository_root}")
+    return branch
 
 
 def load_patches(path: Path, repository_root: Path) -> list[Path]:
@@ -142,10 +151,11 @@ def apply_configured_patches(args: argparse.Namespace) -> int:
         print("Left the patches committed locally.")
         return 0
 
+    branch = args.branch or current_branch(repository_root)
     # Always push, even without new commits: commits left behind by an earlier
     # run would otherwise never reach the remote.
-    run_command(["git", "push", "origin", f"HEAD:{args.branch}"], cwd=repository_root)
-    print(f"Pushed to {args.branch}.")
+    run_command(["git", "push", "origin", f"HEAD:{branch}"], cwd=repository_root)
+    print(f"Pushed to {branch}.")
     return 0
 
 
