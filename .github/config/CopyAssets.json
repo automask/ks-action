@@ -1,6 +1,6 @@
 {
     "clone_url": "https://github.com/marklundin/water.git",
-    "clone_path": "External/water",
+    "clone_path": ".github/external/water",
     "copy_folder": [
         {
             "src_path": "demo/water",
