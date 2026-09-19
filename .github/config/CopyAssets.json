@@ -3,7 +3,7 @@
     "clone_path": ".github/external/water",
     "copy_folder": [
         {
-            "src_path": "demo",
+            "src_path": "demo/assets",
             "dst_path": "Assets/water"
         }
     ],
