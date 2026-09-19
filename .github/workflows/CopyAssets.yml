@@ -1,0 +1,37 @@
+name: Copy Assets
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: Branch of this repository to commit and push to
+        required: true
+        default: main
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  copy:
+    name: Copy water assets into Assets/water
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out workflow source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Clone water and copy assets
+        shell: pwsh
+        env:
+          BRANCH: ${{ inputs.branch }}
+        run: |
+          python Tools\CopyAssets.py `
+            --branch "$env:BRANCH" `
+            --work-dir External\water `
+            --push
