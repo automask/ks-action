@@ -138,6 +138,50 @@ def clone_repository(config: dict, work_dir: Path) -> None:
     run_command(command + [config["clone_url"], str(work_dir)])
 
 
+def describe_layout(root: Path, max_depth: int = 2, limit: int = 40) -> str:
+    """List the clone's directories, so a wrong src_path can be fixed from the log."""
+    lines: list[str] = []
+
+    def walk(directory: Path, depth: int) -> None:
+        if depth > max_depth or len(lines) >= limit:
+            return
+        for path in sorted(directory.iterdir(), key=lambda entry: (entry.is_file(), entry.name)):
+            if path.name == ".git":
+                continue
+
+            lines.append(f"  {'  ' * (depth - 1)}{path.name}{'/' if path.is_dir() else ''}")
+            if len(lines) >= limit:
+                lines.append("  ... (truncated)")
+                return
+            if path.is_dir():
+                walk(path, depth + 1)
+
+    walk(root, 1)
+    return "\n".join(lines)
+
+
+def check_sources(work_dir: Path, folders: list[tuple[Path, Path]], files: list[tuple[Path, Path]]) -> None:
+    """Fail before copying anything, reporting every bad src_path and the clone's real layout."""
+    expected = [(source, "directory") for source, _ in folders] + [(source, "file") for source, _ in files]
+
+    problems: list[str] = []
+    for source, kind in expected:
+        path = work_dir / source
+        if (kind == "directory" and path.is_dir()) or (kind == "file" and path.is_file()):
+            continue
+
+        state = "missing" if not path.exists() else f"is not a {kind}"
+        problems.append(f"  {source.as_posix()} ({state})")
+
+    if problems:
+        raise ValueError(
+            "Configured src_path is not usable in the clone:\n"
+            + "\n".join(problems)
+            + f"\nLayout of {work_dir}:\n"
+            + describe_layout(work_dir)
+        )
+
+
 def copy_folder(source: Path, target: Path, repository_root: Path) -> None:
     if not source.is_dir():
         raise ValueError(f"Asset directory does not exist: {source}")
@@ -214,6 +258,7 @@ def copy_configured_assets(args: argparse.Namespace) -> int:
 
     work_dir = resolve_inside(repository_root, Path(config["clone_path"]))
     clone_repository(config, work_dir)
+    check_sources(work_dir, folders, files)
 
     targets: list[Path] = []
     # Folders first: a folder copy replaces its destination, so files copied into
