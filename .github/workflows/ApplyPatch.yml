@@ -1,0 +1,36 @@
+name: Apply Patch
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: Branch of this repository to commit and push to
+        required: true
+        default: main
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    name: Apply configured patches
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out workflow source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Apply configured patches
+        shell: pwsh
+        env:
+          BRANCH: ${{ inputs.branch }}
+        run: |
+          python .github\tools\ApplyPatch.py `
+            --branch "$env:BRANCH" `
+            --push

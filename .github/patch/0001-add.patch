@@ -1,0 +1,21 @@
+From 412cd9a474e5f33eaf44284b95f0170a1c8dbfd9 Mon Sep 17 00:00:00 2001
+From: kyle <laputa_in@foxmail.com>
+Date: Sat, 19 Sep 2026 20:27:35 +0800
+Subject: [PATCH] add
+
+---
+ Assets/data.txt | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/Assets/data.txt b/Assets/data.txt
+index 3b18e51..121b3a1 100644
+--- a/Assets/data.txt
++++ b/Assets/data.txt
+@@ -1 +1,4 @@
+ hello world
++
++test patch
++
+-- 
+2.54.0.windows.1
+
