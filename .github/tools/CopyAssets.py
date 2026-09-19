@@ -19,7 +19,7 @@ COMMIT_AUTHOR_EMAIL = "41898282+github-actions[bot]@users.noreply.github.com"
 
 
 def parse_args() -> argparse.Namespace:
-    repository_root = Path(__file__).resolve().parents[1]
+    repository_root = Path(__file__).resolve().parents[2]
     parser = argparse.ArgumentParser(description="Clone the water repository and copy its demo assets into Assets/water.")
     parser.add_argument(
         "--repo",
@@ -160,7 +160,7 @@ def commit_assets(args: argparse.Namespace, repository_root: Path, target: Path)
 
 
 def copy_water_assets(args: argparse.Namespace) -> int:
-    repository_root = Path(__file__).resolve().parents[1]
+    repository_root = Path(__file__).resolve().parents[2]
     work_dir = args.work_dir.resolve()
     target = resolve_target(repository_root, args.target)
 

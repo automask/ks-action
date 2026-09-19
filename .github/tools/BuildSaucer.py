@@ -13,7 +13,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 
 def parse_args() -> argparse.Namespace:
-    repository_root = Path(__file__).resolve().parents[1]
+    repository_root = Path(__file__).resolve().parents[2]
     parser = argparse.ArgumentParser(description="Build Saucer with CMake and create a distributable ZIP archive.")
     parser.add_argument(
         "--source",

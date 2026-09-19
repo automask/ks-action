@@ -42,7 +42,7 @@ jobs:
       - name: Build and package Saucer
         shell: pwsh
         run: |
-          python Tools\BuildSaucer.py `
+          python .github\tools\BuildSaucer.py `
             --source Deps\saucer `
             --build-dir Deps\saucer\build `
             --output dist\saucer-windows-x64.zip

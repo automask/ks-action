@@ -42,7 +42,7 @@ jobs:
       - name: Configure and pack Saucer sources
         shell: pwsh
         run: |
-          python Tools\PackSaucer.py `
+          python .github\tools\PackSaucer.py `
             --source Deps\saucer `
             --build-dir Deps\saucer\build `
             --output dist\saucer-src-windows-x64.zip

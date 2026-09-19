@@ -33,7 +33,7 @@ jobs:
           REPOSITORY: ${{ github.repository }}
           BRANCH: ${{ inputs.branch }}
         run: |
-          python Tools\GitMerge.py `
+          python .github\tools\GitMerge.py `
             --repo "https://github.com/$env:REPOSITORY.git" `
             --branch "$env:BRANCH" `
             --work-dir Deps\git-merge

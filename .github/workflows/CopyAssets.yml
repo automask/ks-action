@@ -31,7 +31,7 @@ jobs:
         env:
           BRANCH: ${{ inputs.branch }}
         run: |
-          python Tools\CopyAssets.py `
+          python .github\tools\CopyAssets.py `
             --branch "$env:BRANCH" `
             --work-dir External\water `
             --push

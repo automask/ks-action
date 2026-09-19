@@ -19,7 +19,7 @@ COMMIT_AUTHOR_EMAIL = "41898282+github-actions[bot]@users.noreply.github.com"
 
 
 def parse_args() -> argparse.Namespace:
-    repository_root = Path(__file__).resolve().parents[1]
+    repository_root = Path(__file__).resolve().parents[2]
     parser = argparse.ArgumentParser(description="Clone a repository, write the merge data file and push the change back.")
     parser.add_argument(
         "--repo",
