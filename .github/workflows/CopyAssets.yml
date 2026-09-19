@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   copy:
-    name: Copy water assets into Assets/water
+    name: Copy configured assets
     runs-on: windows-latest
 
     steps:
@@ -26,12 +26,11 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Clone water and copy assets
+      - name: Clone and copy configured assets
         shell: pwsh
         env:
           BRANCH: ${{ inputs.branch }}
         run: |
           python .github\tools\CopyAssets.py `
             --branch "$env:BRANCH" `
-            --work-dir External\water `
             --push

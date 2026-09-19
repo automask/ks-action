@@ -1,5 +1,16 @@
 {
-    "src_url": "https://github.com/marklundin/water.git",
-    "src_path": "demo/water",
-    "dst_path": "Assets/water"
+    "clone_url": "https://github.com/marklundin/water.git",
+    "clone_path": "External/water",
+    "copy_folder": [
+        {
+            "src_path": "demo/water",
+            "dst_path": "Assets/water"
+        }
+    ],
+    "copy_file": [
+        {
+            "src_path": "art/coast.blend",
+            "dst_path": "Assets/water/coast.blend"
+        }
+    ]
 }

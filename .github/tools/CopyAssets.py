@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Clone the water repository and copy its demo assets into Assets/water."""
+"""Clone the repository named in the config and copy the configured assets into this repository."""
 
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import shutil
 import stat
@@ -11,43 +12,22 @@ import subprocess
 import sys
 from pathlib import Path
 
-DEFAULT_REPOSITORY = "https://github.com/marklundin/water.git"
-DEFAULT_SOURCE = Path("demo") / "assets"
-DEFAULT_TARGET = Path("Assets") / "water"
+DEFAULT_CONFIG = Path(".github") / "config" / "CopyAssets.json"
 COMMIT_AUTHOR_NAME = "github-actions[bot]"
 COMMIT_AUTHOR_EMAIL = "41898282+github-actions[bot]@users.noreply.github.com"
 
+CONFIG_KEYS = {"clone_url", "clone_path", "clone_ref", "copy_folder", "copy_file"}
+REQUIRED_KEYS = ("clone_url", "clone_path")
+ENTRY_KEYS = {"src_path", "dst_path"}
 
-def parse_args() -> argparse.Namespace:
-    repository_root = Path(__file__).resolve().parents[2]
-    parser = argparse.ArgumentParser(description="Clone the water repository and copy its demo assets into Assets/water.")
+
+def parse_args(repository_root: Path) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Clone the repository named in the config and copy the configured assets into this repository.")
     parser.add_argument(
-        "--repo",
-        default=DEFAULT_REPOSITORY,
-        help=f"water repository URL to clone (default: {DEFAULT_REPOSITORY}).",
-    )
-    parser.add_argument(
-        "--ref",
-        default="",
-        help="water tag or branch to clone (default: the repository default branch).",
-    )
-    parser.add_argument(
-        "--work-dir",
+        "--config",
         type=Path,
-        default=repository_root / "External" / "water",
-        help="Clone destination (default: External/water).",
-    )
-    parser.add_argument(
-        "--source",
-        type=Path,
-        default=DEFAULT_SOURCE,
-        help=f"Assets directory inside the clone (default: {DEFAULT_SOURCE.as_posix()}).",
-    )
-    parser.add_argument(
-        "--target",
-        type=Path,
-        default=DEFAULT_TARGET,
-        help=f"Assets directory in this repository (default: {DEFAULT_TARGET.as_posix()}).",
+        default=repository_root / DEFAULT_CONFIG,
+        help=f"JSON config file (default: {DEFAULT_CONFIG.as_posix()}).",
     )
     parser.add_argument(
         "--branch",
@@ -56,7 +36,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--message",
-        default="Copy water demo assets",
+        default="Copy assets",
         help="Commit message.",
     )
     parser.add_argument(
@@ -86,6 +66,58 @@ def remove_tree(directory: Path) -> None:
         shutil.rmtree(directory, onerror=force_permissions)
 
 
+def load_config(path: Path) -> dict:
+    if not path.is_file():
+        raise ValueError(f"Config file does not exist: {path}")
+
+    try:
+        config = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as error:
+        raise ValueError(f"Invalid JSON in {path}: {error}") from error
+
+    if not isinstance(config, dict):
+        raise ValueError(f"Config must be a JSON object: {path}")
+
+    unknown = sorted(set(config) - CONFIG_KEYS)
+    if unknown:
+        raise ValueError(f"Unknown config key(s) in {path}: {', '.join(unknown)}")
+
+    for key in REQUIRED_KEYS:
+        if not isinstance(config.get(key), str) or not config[key]:
+            raise ValueError(f"Config needs a non-empty '{key}' string: {path}")
+
+    if not isinstance(config.get("clone_ref", ""), str):
+        raise ValueError(f"Config key 'clone_ref' must be a string: {path}")
+    return config
+
+
+def parse_entries(config: dict, key: str, path: Path) -> list[tuple[Path, Path]]:
+    entries = config.get(key, [])
+    if not isinstance(entries, list):
+        raise ValueError(f"Config key '{key}' must be a list: {path}")
+
+    parsed: list[tuple[Path, Path]] = []
+    for index, entry in enumerate(entries):
+        if not isinstance(entry, dict):
+            raise ValueError(f"{key}[{index}] must be a JSON object: {path}")
+
+        unknown = sorted(set(entry) - ENTRY_KEYS)
+        if unknown:
+            raise ValueError(f"Unknown {key}[{index}] key(s) in {path}: {', '.join(unknown)}")
+
+        source, target = entry.get("src_path"), entry.get("dst_path")
+        if not isinstance(source, str) or not source or not isinstance(target, str) or not target:
+            raise ValueError(f"{key}[{index}] needs non-empty 'src_path' and 'dst_path' strings: {path}")
+
+        parsed.append((Path(source), Path(target)))
+    return parsed
+
+
+def resolve_inside(repository_root: Path, path: Path) -> Path:
+    resolved = path if path.is_absolute() else repository_root / path
+    return resolved.resolve()
+
+
 def prepare_work_dir(work_dir: Path) -> None:
     if not work_dir.exists():
         work_dir.parent.mkdir(parents=True, exist_ok=True)
@@ -97,17 +129,18 @@ def prepare_work_dir(work_dir: Path) -> None:
     remove_tree(work_dir)
 
 
-def clone_water(args: argparse.Namespace, work_dir: Path) -> None:
+def clone_repository(config: dict, work_dir: Path) -> None:
     prepare_work_dir(work_dir)
+
     command = ["git", "clone", "--depth", "1"]
-    if args.ref:
-        command += ["--branch", args.ref]
-    run_command(command + [args.repo, str(work_dir)])
+    if config.get("clone_ref"):
+        command += ["--branch", config["clone_ref"]]
+    run_command(command + [config["clone_url"], str(work_dir)])
 
 
-def copy_assets(source: Path, target: Path, repository_root: Path) -> None:
+def copy_folder(source: Path, target: Path, repository_root: Path) -> None:
     if not source.is_dir():
-        raise ValueError(f"water assets directory does not exist: {source}")
+        raise ValueError(f"Asset directory does not exist: {source}")
 
     if not target.is_relative_to(repository_root):
         raise ValueError(f"Refusing to write assets outside the repository: {target}")
@@ -121,18 +154,28 @@ def copy_assets(source: Path, target: Path, repository_root: Path) -> None:
     print(f"Copied {len(files)} file(s) from {source} to {target}")
 
 
-def resolve_target(repository_root: Path, target: Path) -> Path:
-    resolved = target if target.is_absolute() else repository_root / target
-    return resolved.resolve()
+def copy_file(source: Path, target: Path, repository_root: Path) -> None:
+    if not source.is_file():
+        raise ValueError(f"Asset file does not exist: {source}")
+
+    if not target.is_relative_to(repository_root):
+        raise ValueError(f"Refusing to write assets outside the repository: {target}")
+
+    if target.is_dir():
+        raise ValueError(f"Asset file target is a directory: {target}")
+
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, target)
+    print(f"Copied file {source} to {target}")
 
 
-def commit_assets(args: argparse.Namespace, repository_root: Path, target: Path) -> int:
-    relative_target = target.relative_to(repository_root).as_posix()
-    run_command(["git", "add", "--", relative_target], cwd=repository_root)
+def commit_assets(args: argparse.Namespace, repository_root: Path, targets: list[Path]) -> int:
+    relative_targets = [target.relative_to(repository_root).as_posix() for target in targets]
+    run_command(["git", "add", "--", *relative_targets], cwd=repository_root)
 
     staged = run_command(["git", "diff", "--cached", "--quiet"], cwd=repository_root, check=False)
     if staged.returncode == 0:
-        print(f"No changes under {relative_target}; nothing to commit.")
+        print(f"No changes under {', '.join(relative_targets)}; nothing to commit.")
     else:
         run_command(
             [
@@ -149,30 +192,49 @@ def commit_assets(args: argparse.Namespace, repository_root: Path, target: Path)
         )
 
     if not args.push:
-        print(f"Left {relative_target} committed locally.")
+        print(f"Left {', '.join(relative_targets)} committed locally.")
         return 0
 
     # Always push, even without a new commit: a commit left behind by an earlier
     # run would otherwise never reach the remote.
     run_command(["git", "push", "origin", f"HEAD:{args.branch}"], cwd=repository_root)
-    print(f"Pushed {relative_target} to {args.branch}.")
+    print(f"Pushed {', '.join(relative_targets)} to {args.branch}.")
     return 0
 
 
-def copy_water_assets(args: argparse.Namespace) -> int:
+def copy_configured_assets(args: argparse.Namespace) -> int:
     repository_root = Path(__file__).resolve().parents[2]
-    work_dir = args.work_dir.resolve()
-    target = resolve_target(repository_root, args.target)
+    config_path = resolve_inside(repository_root, args.config)
 
-    clone_water(args, work_dir)
-    copy_assets(work_dir / args.source, target, repository_root)
-    return commit_assets(args, repository_root, target)
+    config = load_config(config_path)
+    folders = parse_entries(config, "copy_folder", config_path)
+    files = parse_entries(config, "copy_file", config_path)
+    if not folders and not files:
+        raise ValueError(f"Config lists nothing to copy, expected 'copy_folder' or 'copy_file': {config_path}")
+
+    work_dir = resolve_inside(repository_root, Path(config["clone_path"]))
+    clone_repository(config, work_dir)
+
+    targets: list[Path] = []
+    # Folders first: a folder copy replaces its destination, so files copied into
+    # that destination beforehand would be dropped.
+    for source, target in folders:
+        resolved_target = resolve_inside(repository_root, target)
+        copy_folder(work_dir / source, resolved_target, repository_root)
+        targets.append(resolved_target)
+
+    for source, target in files:
+        resolved_target = resolve_inside(repository_root, target)
+        copy_file(work_dir / source, resolved_target, repository_root)
+        targets.append(resolved_target)
+
+    return commit_assets(args, repository_root, targets)
 
 
 def main() -> int:
-    args = parse_args()
+    args = parse_args(Path(__file__).resolve().parents[2])
     try:
-        return copy_water_assets(args)
+        return copy_configured_assets(args)
     except (OSError, subprocess.CalledProcessError, ValueError) as error:
         print(f"error: {error}")
         return 1
